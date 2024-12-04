@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "moveii",
+  "version": "1.0-SNAPSHOT",
+  "name": "moveII",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/moveii/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "org.hali.moveii.client.MoveiiClient"
+    ],
+    "main": [
+      "org.hali.moveii.Moveii"
+    ]
+  },
+  "mixins": [
+    "moveii.mixins.json",
+    {
+      "config": "moveii.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "fabric": "*",
+    "minecraft": "1.20.1"
+  }
+}
