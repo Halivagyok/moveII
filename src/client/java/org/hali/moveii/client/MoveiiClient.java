@@ -4,54 +4,63 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
+import net.minecraft.util.math.Vec3d;
+
+import org.hali.moveii.Moveii;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class MoveiiClient implements ClientModInitializer {
-
+    private static final MinecraftClient client = MinecraftClient.getInstance();
     private boolean hasDoubleJumped = false;
+    private final Map<PlayerEntity, Long> lastDashTime = new HashMap<>();
 
     @Override
     public void onInitializeClient() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            PlayerEntity player = client.player;
-
-            if (player != null) {
-                // Check if the player is jumping and hasn't already double-jumped
-                if (client.options.jumpKey.isPressed() && !hasDoubleJumped) {
-                    // Do your double jump logic here
-                    handleDoubleJump(player);
-                }
-
-                // Handle dashing only when the "Special Stick" is in the main or off-hand
-                if (isHoldingSpecialStick(player)) {
-                    handleDash(player);
-                }
+            if (client.player != null) {
+                handleDoubleJump(client.player);
+                handleDash(client.player);
             }
         });
     }
 
     private void handleDoubleJump(PlayerEntity player) {
-        // Example double jump behavior, modify as needed
-        if (!hasDoubleJumped) {
-            player.addVelocity(0, 0.5, 0); // Adjust this for double jump height
-            hasDoubleJumped = true; // Set the flag so it doesn't double jump again
+        if (!Moveii.getDoubleJumpEnabled().getOrDefault(player, false)) return;
+
+        if (!player.isOnGround() && !player.isSwimming()) {
+            if (!hasDoubleJumped && client.options.jumpKey.isPressed()) {
+                if (player.getVelocity().y < 0) {
+                    double jumpHeight = Moveii.getDoubleJumpHeight().getOrDefault(player, 0.8);
+                    Vec3d velocity = player.getVelocity();
+                    player.setVelocity(velocity.x, jumpHeight, velocity.z);
+                    hasDoubleJumped = true;
+                    player.fallDistance = 0.0f; // Prevent fall damage
+                }
+            }
+        } else if (player.isOnGround()) {
+            hasDoubleJumped = false;
         }
     }
 
-    private boolean isHoldingSpecialStick(PlayerEntity player) {
-        // Check if the player is holding the "Special Stick" in either hand
-        return (player.getMainHandStack().getItem() == Items.STICK && player.getMainHandStack().hasNbt()
-                && player.getMainHandStack().getNbt().contains("AllowedItem")
-                && "Special".equals(player.getMainHandStack().getNbt().getString("AllowedItem")))
-                || (player.getOffHandStack().getItem() == Items.STICK && player.getOffHandStack().hasNbt()
-                && player.getOffHandStack().getNbt().contains("AllowedItem")
-                && "Special".equals(player.getOffHandStack().getNbt().getString("AllowedItem")));
-    }
-
     private void handleDash(PlayerEntity player) {
-        if (MinecraftClient.getInstance().options.sneakKey.isPressed()) {
-            // Dash effect, adjust the values to make it feel right for your game
-            player.addVelocity(player.getRotationVector().x * 1.5, 0, player.getRotationVector().z * 1.5);
+        if (!Moveii.getDashEnabled().getOrDefault(player, false)) return;
+
+        if (client.options.sneakKey.isPressed()) {
+            long currentTime = System.currentTimeMillis();
+            long dashCooldown = Moveii.getDashCooldown().getOrDefault(player, 1000L);
+
+            if (lastDashTime.getOrDefault(player, 0L) + dashCooldown > currentTime) {
+                return;
+            }
+
+            double dashLength = Moveii.getDashLength().getOrDefault(player, 1.5);
+            Vec3d lookVector = player.getRotationVec(1.0F).normalize();
+            Vec3d dashVelocity = lookVector.multiply(dashLength);
+            player.setVelocity(dashVelocity.x, player.getVelocity().y, dashVelocity.z);
+
+            lastDashTime.put(player, currentTime);
         }
     }
 }
